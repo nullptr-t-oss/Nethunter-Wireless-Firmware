@@ -2,100 +2,59 @@ name: Release Module Zip
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+' 
+    inputs:
+      version:
+        description: 'Base Version (e.g., v2.0.X)'
+        required: true
+        default: 'v2.0.5'  # Default version
+        type: string
+      revision:
+        description: 'Revision (e.g., rX)'
+        required: true
+        default: 'r0'      # Default revision
+        type: string
 
 jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write 
+      contents: write
+
+    env:
+      FULL_TAG: "${{ inputs.version }}-${{ inputs.revision }}"
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 
 
-      - name: Configure Git for Tagging
+      - name: Configure Git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-      
-      - name: Determine Next Release Tag
-        id: determine_tag
+
+      - name: Create and Push Tag
         run: |
-          
-          LATEST_BASE_TAG=$(git tag -l "v[0-9]*.[0-9]*.[0-9]*" | sort -V | tail -n 1)
-
-          if [ -z "$LATEST_BASE_TAG" ]; then
-            LATEST_BASE_TAG="v0.0.0"
-            echo "No existing base tag found. Starting with $LATEST_BASE_TAG-r0"
-            NEW_TAG="${LATEST_BASE_TAG}-r0"
-          else
-            echo "Latest base tag found: $LATEST_BASE_TAG"
-
-            LATEST_R_TAG=$(git tag -l "${LATEST_BASE_TAG}-r*" | sort -V | tail -n 1)
-            
-            if [ -z "$LATEST_R_TAG" ]; then
-              echo "No -rN tag found for $LATEST_BASE_TAG. Starting with -r0"
-              NEW_TAG="${LATEST_BASE_TAG}-r0"
-            else
-              echo "Latest -rN tag found: $LATEST_R_TAG"
-              
-              CURRENT_R_NUM=$(echo "$LATEST_R_TAG" | grep -oP '(?<=-r)[0-9]+$')
-              NEXT_R_NUM=$((CURRENT_R_NUM + 1))
-              NEW_TAG="${LATEST_BASE_TAG}-r${NEXT_R_NUM}"
-              echo "Next Tag determined: $NEW_TAG (incremented from $LATEST_R_TAG)"
-            fi
-          fi
-          
-          echo "NEW_TAG=$NEW_TAG" >> $GITHUB_OUTPUT
-      
-      - name: Check if Tag Already Exists
-        id: tag_check
-        run: |
-          NEW_TAG="${{ steps.determine_tag.outputs.NEW_TAG }}"
-          if git rev-parse -q --verify "refs/tags/$NEW_TAG" >/dev/null; then
-            echo "Tag $NEW_TAG already exists locally. Skipping tag creation and push."
-            echo "tag_exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "Tag $NEW_TAG does not exist. Proceeding to create and push."
-            echo "tag_exists=false" >> $GITHUB_OUTPUT
-          fi
-
-
-      - name: Create and Push New Tag
-        if: steps.tag_check.outputs.tag_exists == 'false'
-        run: |
-          NEW_TAG="${{ steps.determine_tag.outputs.NEW_TAG }}"
-          git tag $NEW_TAG
-          git push origin $NEW_TAG
-          echo "Successfully created and pushed tag $NEW_TAG"
+          echo "Creating tag: $FULL_TAG"
+          git tag $FULL_TAG
+          git push origin $FULL_TAG
 
       - name: Create ZIP Archive
         id: create_archive
         run: |
-          TAG_NAME="${{ steps.determine_tag.outputs.NEW_TAG }}"
           REPO_NAME=$(basename ${{ github.repository }})
-          ARCHIVE_FILE="${REPO_NAME}-${TAG_NAME}.zip"
+          ARCHIVE_FILE="${REPO_NAME}-${FULL_TAG}.zip"
           
-          echo "Creating archive: $ARCHIVE_FILE"
-          
-          git archive --format zip --output $ARCHIVE_FILE $TAG_NAME
+          echo "Zipping tag: $FULL_TAG into $ARCHIVE_FILE"
+          git archive --format zip --output $ARCHIVE_FILE $FULL_TAG
           
           echo "ARCHIVE_FILE=$ARCHIVE_FILE" >> $GITHUB_OUTPUT
-          
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.determine_tag.outputs.NEW_TAG }}
-          name: Release ${{ steps.determine_tag.outputs.NEW_TAG }}
+          tag_name: ${{ env.FULL_TAG }}
+          name: Release ${{ env.FULL_TAG }}
           body: |
-            Automated build for version ${{ steps.determine_tag.outputs.NEW_TAG }}.
-            
-            This release candidate is based on the base version ${{ steps.determine_tag.outputs.NEW_TAG }} (before -rN).
+            Manual build for version ${{ inputs.version }}, revision ${{ inputs.revision }}.
           files: |
             ${{ steps.create_archive.outputs.ARCHIVE_FILE }}
-            
