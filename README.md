@@ -27,6 +27,9 @@ This Magisk module adds the required firmware for external wireless adapters to 
 
 #### Changelog
 
+* v2.0.6
+    - Added firmware files for rtl_bt from https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/tree/rtl_bt
+
 * v2.0.5
     - Added firmware files for rtw88 drivers from https://github.com/lwfinger/rtw88
 

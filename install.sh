@@ -124,7 +124,7 @@ REPLACE="
 print_modname() {
   ui_print "*******************************"
   ui_print "      NH Wireless Firmware     "
-  ui_print "   - IamCOD3X & 0x-br0k3n    "
+  ui_print "  - IamCOD3X & nullptr-t-oss -   "
   ui_print "*******************************"
 }
 
